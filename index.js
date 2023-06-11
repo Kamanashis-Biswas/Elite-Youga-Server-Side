@@ -41,6 +41,20 @@ async function run() {
       res.send(result);
     });
 
+    app.get('/user', async (req, res)=>{
+      try{
+        const {email} = req.query;
+        const user = await usersCollection.findOne({email});
+        console.log(user);
+        if(user){
+          return res.json({user: user});
+        }
+        return res.status(400).json({message: "User not found!"});
+      }catch(err){
+        return res.status(500).json({message: "Internal Server Error!"});
+      }
+
+    });
 
 
     // Send a ping to confirm a successful connection

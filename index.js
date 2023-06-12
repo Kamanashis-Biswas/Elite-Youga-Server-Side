@@ -57,7 +57,7 @@ async function run() {
       }
     });
 
-
+    
     app.post('/users', async (req, res) => {
       const user = req.body;
       const query = { email: user.email }

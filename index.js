@@ -57,7 +57,16 @@ async function run() {
       }
     });
 
-    
+    app.get('/my-class', async(req, res)=>{
+      try{
+        const {email} = req.query;
+        const classes = await classCollection.find({inst_email: email}).toArray();
+        return res.json({data: classes});
+      }catch(err){
+        return res.status(500).json({message: "Internal server error!"});
+      }
+    });
+
     app.post('/users', async (req, res) => {
       const user = req.body;
       const query = { email: user.email }

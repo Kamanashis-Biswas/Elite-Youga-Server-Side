@@ -36,6 +36,27 @@ async function run() {
       * _id, class_name, class_image, available_seats, price, inst_name, inst_email
     }*/
 
+    app.post('/add-class', async(req, res)=>{
+      try{
+        const {inst_email} = req.body;
+        const user = await usersCollection.findOne({email: inst_email});
+        if(!user) return res.status(401).json({message: "Please enter a valid email!"});
+        if(user.role !== "instructors") return res.status(401).json({message: "User Doesn't have access to create a class!"});
+        const property = {class_name: null, class_image: null, seats: 0, price: 0, inst_name:null, inst_email:null};
+        Object.keys(property).forEach((k)=>{
+          if(req.body[k]) property[k] = req.body[k];
+        });
+        const cls = await classCollection.insertOne(property);
+        if(cls) return res.json({cls});
+        return res.status(400).json({message: "Class could not be added!"});
+
+
+      }catch(err){
+        console.log(err);
+        return res.status(500).json({message:"Internal Server Error!"});
+      }
+    });
+
 
     app.post('/users', async (req, res) => {
       const user = req.body;

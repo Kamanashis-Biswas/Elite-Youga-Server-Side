@@ -31,6 +31,11 @@ async function run() {
     await client.connect();
     const usersCollection = client.db("AssignmentTwelve").collection("users");
 
+    const classCollection = client.db("AssignmentTwelve").collection("class");
+    /*{
+      * _id, class_name, class_image, available_seats, price, inst_name, inst_email
+    }*/
+
 
     app.post('/users', async (req, res) => {
       const user = req.body;

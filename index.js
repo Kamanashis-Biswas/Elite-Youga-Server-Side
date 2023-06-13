@@ -116,8 +116,12 @@ async function run() {
     app.get('/user', async (req, res)=>{
       try{
         const {email} = req.query;
+        if(!email){
+          const users = await usersCollection.find({}).toArray();
+          if(users) return res.json({users});
+          return res.status(400).json({message: "users not found!"});
+        }
         const user = await usersCollection.findOne({email});
-        console.log(user);
         if(user){
           return res.json({user: user});
         }
@@ -128,6 +132,15 @@ async function run() {
 
     });
 
+    app.get('/instructors', async(req, res)=>{
+      try{
+        const inst = await usersCollection.find({role: 'instructors'}).toArray();
+        return res.json(inst);
+
+      }catch(err){
+        return res.status(500).json({message: "Internal Server Error!"});
+      }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

@@ -13,7 +13,7 @@ app.use(express.json());
 
 
 
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId} = require('mongodb');
 const uri = `mongodb+srv://${DB_USER}:${DB_PASS}@cluster0.hoz6vx5.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -46,7 +46,7 @@ async function run() {
         Object.keys(property).forEach((k)=>{
           if(req.body[k]) property[k] = req.body[k];
         });
-        const cls = await classCollection.insertOne(property);
+        const cls = await classCollection.insertOne({...property, status:'pending'});
         if(cls) return res.json({cls});
         return res.status(400).json({message: "Class could not be added!"});
 
@@ -56,7 +56,7 @@ async function run() {
         return res.status(500).json({message:"Internal Server Error!"});
       }
     });
-
+    
     app.get('/update-class', async(req, res)=>{
       try{
         const {id, status} = req.query;
@@ -141,6 +141,7 @@ async function run() {
         return res.status(500).json({message: "Internal Server Error!"});
       }
     });
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });

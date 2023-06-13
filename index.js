@@ -69,6 +69,18 @@ async function run() {
       }
     });
 
+    app.get('/update-user', async(req, res)=>{
+      try{
+        const {id, role} = req.query;
+        const cls = await usersCollection.updateOne({_id: new ObjectId(id)}, { $set: { role: role } });
+        if(cls) return res.json(cls);
+        return req.status(401).json({message:"update failed!"});
+      }catch(err){
+        console.log(err);
+        return res.status(500).json({message: "Internal Sever error!"});
+      }
+    });
+
     app.get('/my-class', async(req, res)=>{
       try{
         const {email} = req.query;

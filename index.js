@@ -30,12 +30,67 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     const usersCollection = client.db("AssignmentTwelve").collection("users");
-
-    const classCollection = client.db("AssignmentTwelve").collection("class");
     /*{
       * _id, class_name, class_image, available_seats, price, inst_name, inst_email
     }*/
+    const classCollection = client.db("AssignmentTwelve").collection("class");
+    const sClassCollection = client.db('AssignmentTwelve').collection("sclass");
 
+
+    app.delete('/delete-class', async(req, res)=>{
+      try{
+        const {classId, userId} = req.query;
+        const cls = await sClassCollection.findOneAndDelete({$and: [{classId: new ObjectId(classId)}, {userId: new ObjectId(userId)}]});
+        if(cls) return res.json({message: "Selected class deleted"});
+        return res.status(400).json({message: "Class not deleted!"});
+
+      }catch(err){
+        return res.status(500).json({message: 'Internal Server Error!'});
+      }
+    })
+
+    app.post('/set-class', async(req, res)=>{
+      try{
+        const {classId, userId} = req.body;
+        if(!userId) return res.status(400).json({message: "Please enter a valid userId"});
+        const cls = await classCollection.findOne({_id: new ObjectId(classId)});
+        if(cls){
+          // await classCollection.updateOne({_id: new ObjectId(classId)}, {$set: {seats: cls.seats - 1}});
+          const isSel = await sClassCollection.findOne({$and:[{userId: new ObjectId(userId)}, {classId: new ObjectId(classId)}]});
+          if(!isSel){
+            const scnew = await sClassCollection.insertOne({classId: new ObjectId(classId), userId: new ObjectId(userId)});
+            return res.json({message: "Class added to list!"});
+          }
+          return res.status(400).json({message: "User already selected this class!"});
+        }
+        return res.status(401).json({message: "Class Not found or Seats not found!"})
+
+      }catch(err){
+        console.log(err);
+        return res.status(500).json({message: "Internal Sever Error!"});
+      }
+
+    });
+
+    app.get('/get-sclass', async (req, res)=>{
+      try{
+        const {userId} = req.query;
+        const classes = await sClassCollection.aggregate([
+          {$match: {userId: new ObjectId(userId)}},
+          {
+            $lookup: {
+              from: "class",
+              localField: "classId",
+              foreignField: "_id",
+              as: "classes"
+            }
+          },
+        ]).toArray();
+        return res.json(classes);
+      }catch(err){
+        return res.status(500).json({message: 'Internal Server Error!'});
+      }
+    });
     app.post('/add-class', async(req, res)=>{
       try{
         const {inst_email} = req.body;
@@ -135,6 +190,16 @@ async function run() {
     app.get('/instructors', async(req, res)=>{
       try{
         const inst = await usersCollection.find({role: 'instructors'}).toArray();
+        return res.json(inst);
+
+      }catch(err){
+        return res.status(500).json({message: "Internal Server Error!"});
+      }
+    });
+
+    app.get('/students', async(req, res)=>{
+      try{
+        const inst = await usersCollection.find({role: 'students'}).toArray();
         return res.json(inst);
 
       }catch(err){

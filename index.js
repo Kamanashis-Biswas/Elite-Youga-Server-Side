@@ -3,6 +3,7 @@ const express = require('express');
 const app = express();
 const cors = require('cors');
 const port = process.env.PORT || 5000;
+const stripe = require('stripe')(process.env.STRIPE_PRIVATE_KEY);
 
 const DB_USER = process.env.DB_USER;
 const DB_PASS = process.env.DB_PASS;
@@ -35,7 +36,47 @@ async function run() {
     }*/
     const classCollection = client.db("AssignmentTwelve").collection("class");
     const sClassCollection = client.db('AssignmentTwelve').collection("sclass");
+    const eClassCollection = client.db('AssignmentTwelve').collection("eclass");
 
+    app.post('/payments', async(req, res)=>{
+      try{
+        const {classId, userId} = req.body;
+        const cls = await classCollection.findOne({_id: new ObjectId(classId)});
+        if(cls){
+          await classCollection.updateOne({_id: new ObjectId(classId)}, {$set: {seats: cls.seats - 1, enrolled: cls.enrolled + 1}});
+          const sclass = await sClassCollection.findOneAndDelete({userId: new ObjectId(userId), classId: new ObjectId(classId)});
+          if(sclass){
+            const eeclass = await eClassCollection.findOne({classId: new ObjectId(classId), userId: new ObjectId(userId)});
+            if(eeclass) return res.status(400).json({message: "class already enrolled!"});
+            const neclass = await eClassCollection.insertOne({classId: new ObjectId(classId), userId: new ObjectId(userId)});
+            if(neclass) return res.json({message: "Enrolled to class", confirm: true});
+          }
+          return res.json({message: "Class Couldn't be found!"});
+        }
+        return res.json({message: "class not found!"});
+
+      }catch(err){
+        res.status(500).json({message: "Internal Server Error"});
+      }
+    })
+
+    app.post('/create-payment-intent', async(req, res)=>{
+      try{
+        const {price} = req.body;
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: price, 
+          currency: 'usd',
+          automatic_payment_methods: {enabled: true},
+        });
+        
+        return res.json({clientSecret: paymentIntent.client_secret})
+
+      }catch(err){
+        res.status(500).json({message: "Internal Server Error!"});
+      }
+
+    });
 
     app.delete('/delete-class', async(req, res)=>{
       try{
@@ -47,7 +88,42 @@ async function run() {
       }catch(err){
         return res.status(500).json({message: 'Internal Server Error!'});
       }
-    })
+    });
+
+    app.get('/class/:id', async(req, res)=>{
+      try{
+        const {id} = req.params;
+        const cls = await classCollection.findOne({_id: new ObjectId(id)});
+        if(!cls) return res.status(404).json({message: "Class Not found!"});
+        res.json(cls);
+      }catch(err){
+        res.status(500).json({message: "Internal Server Error!"});
+      }
+
+    });
+
+    app.post('/set-eclass', async(req, res)=>{
+      try{
+        const {classId, userId} = req.body;
+        if(!userId) return res.status(400).json({message: "Please enter a valid userId"});
+        const cls = await classCollection.findOne({_id: new ObjectId(classId)});
+        if(cls){
+          // await classCollection.updateOne({_id: new ObjectId(classId)}, {$set: {seats: cls.seats - 1}});
+          const isSel = await eClassCollection.findOne({$and:[{userId: new ObjectId(userId)}, {classId: new ObjectId(classId)}]});
+          if(!isSel){
+            const scnew = await eClassCollection.insertOne({classId: new ObjectId(classId), userId: new ObjectId(userId)});
+            return res.json({message: "Enrolled to the class!"});
+          }
+          return res.status(400).json({message: "User already enrolled in this class!"});
+        }
+        return res.status(401).json({message: "Class Not found or Seats not found!"})
+
+      }catch(err){
+        console.log(err);
+        return res.status(500).json({message: "Internal Sever Error!"});
+      }
+
+    });
 
     app.post('/set-class', async(req, res)=>{
       try{
@@ -57,6 +133,8 @@ async function run() {
         if(cls){
           // await classCollection.updateOne({_id: new ObjectId(classId)}, {$set: {seats: cls.seats - 1}});
           const isSel = await sClassCollection.findOne({$and:[{userId: new ObjectId(userId)}, {classId: new ObjectId(classId)}]});
+          const iseclass = await eClassCollection.findOne({$and:[{userId: new ObjectId(userId)}, {classId: new ObjectId(classId)}]});
+          if(iseclass) return res.status(400).json({message: "Class already enrolled!"});
           if(!isSel){
             const scnew = await sClassCollection.insertOne({classId: new ObjectId(classId), userId: new ObjectId(userId)});
             return res.json({message: "Class added to list!"});
@@ -91,6 +169,26 @@ async function run() {
         return res.status(500).json({message: 'Internal Server Error!'});
       }
     });
+
+    app.get('/get-eclass', async (req, res)=>{
+      try{
+        const {userId} = req.query;
+        const classes = await eClassCollection.aggregate([
+          {$match: {userId: new ObjectId(userId)}},
+          {
+            $lookup: {
+              from: "class",
+              localField: "classId",
+              foreignField: "_id",
+              as: "classes"
+            }
+          },
+        ]).toArray();
+        return res.json(classes);
+      }catch(err){
+        return res.status(500).json({message: 'Internal Server Error!'});
+      }
+    });
     app.post('/add-class', async(req, res)=>{
       try{
         const {inst_email} = req.body;
@@ -101,7 +199,7 @@ async function run() {
         Object.keys(property).forEach((k)=>{
           if(req.body[k]) property[k] = req.body[k];
         });
-        const cls = await classCollection.insertOne({...property, status:'pending'});
+        const cls = await classCollection.insertOne({...property, status:'pending', enrolled: 0});
         if(cls) return res.json({cls});
         return res.status(400).json({message: "Class could not be added!"});
 

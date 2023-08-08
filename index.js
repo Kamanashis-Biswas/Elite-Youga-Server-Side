@@ -33,9 +33,9 @@ const client = new MongoClient(uri, {
       console.log("connected");
     });
     const usersCollection = client.db("AssignmentTwelve").collection("users");
-    /*{
-      * _id, class_name, class_image, available_seats, price, inst_name, inst_email
-    }*/yield
+    // /*{
+    //   * _id, class_name, class_image, available_seats, price, inst_name, inst_email
+    // }*/yield
     const classCollection = client.db("AssignmentTwelve").collection("class");
     const sClassCollection = client.db('AssignmentTwelve').collection("sclass");
     const eClassCollection = client.db('AssignmentTwelve').collection("eclass");
